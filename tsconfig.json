@@ -1,0 +1,13 @@
+{
+  "exclude": [],
+  "include": ["src"],
+  "compilerOptions": {
+    "outDir": "./dist",
+    "pretty": true,
+    "strict": true,
+    "sourceMap": true,
+    "module": "nodenext",
+    "declaration": true,
+    "moduleResolution": "nodenext"
+  }
+}

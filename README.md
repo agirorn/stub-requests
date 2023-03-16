@@ -1,100 +1,75 @@
-# stub-request
+# stub-requests
 
-> Stub out http request for testing purposes
+> Stub out webserver request like http and WebSocket messages for testing
+> purposes
 
 ## API
 
 ```typescript
-  import type { Trades } from "../../src/types.js";
-  import { suite } from 'sanna';
-  import stubRequest from 'stub-request';
-  import type { Application, Request, response } from 'stub-request';
-
-  stubRequest.blockAllNetworkTrafic = true;
-
   /**
    * All non stubbed routes end in HTTP 404
    */
-  stubRequest.to('https://api.binance.com', (app: Application) => {
-    app.get('/api/v3/trades', (req: Request, res: Response) => {
-      // The request will resolve to an HTTP 500  error if the assertaion fails
-      // and the original error will be printed to the console
-      assert(
-        req.query,
-        {
-          symbol: 'BTCBUSD',
-          limit: 10,
-        }
-      );
-      // The request will resolve to an HTTP 500  error if the assertaion fails
-      // and the original error will be printed to the console
-      assert(req.headers['content-type'], 'application/json'),
-      // The request will resolve to an HTTP 500  error if the assertaion fails
-      // and the original error will be printed to the console
-      assert(req.headers['Accept'], 'application/json'),
-      // res.statusCode = 200; // Not needed since `res.sendJSON` does it.
-      res.sendJSON([
-        {
-          id: 28457,
-          price: '4.00000100',
-          qty: '12.00000000',
-          quoteQty: '48.000012',
-          time: 1499865549590,
-          isBuyerMaker: true,
-          isBestMatch: true,
-        },
-      ]);
+  import { stubRequests } from "stub-requests"
+  import type { Server } from "stub-requests"
+
+  server: Server = await stubRequests((app) => {
+    app.get('/path', (req, res) => {
+      res.send('Its all OK');
     });
   });
-
-  const test = suite('Binance API');
-  test("get trades", () => {
-    const tradres = JSON.parse(
-      await got("https://api.binance.com/api/v3/trades", {
-        searchParams: {
-          symbol: 'BTCBUSD',
-          limit: 10,
-        },
-        headers: {
-          'content-type': 'application/json',
-          'Accept': 'application/json',
-        },
-      })
-    ).body) as Trades;
-
-    assert.deepStrictEqual<Trades>(
-      tradres,
-      [
-        {
-          id: 28457,
-          price: '4.00000100',
-          qty: '12.00000000',
-          quoteQty: '48.000012',
-          time: 1499865549590,
-          isBuyerMaker: true,
-          isBestMatch: true,
-        },
-      ]
-    );
+  const res = await fetch(`http://localhost:${server.port}/path`, {
+    method: 'get',
   });
 
+  assert.equal(await res.text(), 'Its all OK');
+  assert.equal(res.status, 200);
+
+  await server.close();
 ```
 
 ## API WebSocet
 
 ```typescript
-  import type { Trades } from "../../src/types.js";
-  import { suite } from 'sanna';
-  import stubRequest from 'stub-request';
-  import type { Application, Request, response } from 'stub-request';
+  const sockets: Sockets = {
+    '/test': (wss: WebSocketServer): void => {
+      wss.on('connection', (ws) => {
+        ws.on('message', (message: string) => {
+          if (message) {
+            ws.send('Result from the WebSocket');
+          }
+        });
+      });
+    },
+    '/path2': (wss: WebSocketServer): void => {
+      wss.on('connection', (ws) => {
+        ws.on('message', (message: string) => {
+          if (message) {
+            ws.send('Result from the WebSocket path2');
+          }
+        });
+      });
+    },
+  };
 
-  stubRequest.webSocket('wss://api.binance.com', (socket: WebSocket) => {
-     socket.on('connect', (client) => {
-       client.on('message', (msg) => {
+  const server = await stubRequests(sockets);
 
-       });
-     });
-     socket.on('disconect', (client) => {
-     });
+  const ws1 = new WebSocket(`ws://localhost:${server.port}/test`);
+  const result1 = new Promise<string>((resolve) => {
+    ws1.once('message', resolve);
   });
+  ws1.once('open', () => {
+    ws1.send('something');
+  });
+  assert.equal((await result1).toString(), 'Result from the WebSocket');
+
+  const ws2 = new WebSocket(`ws://localhost:${server.port}/path2`);
+  const result2 = new Promise<string>((resolve) => {
+    ws2.once('message', resolve);
+  });
+  ws2.once('open', () => {
+    ws2.send('something');
+  });
+  assert.equal((await result2).toString(), 'Result from the WebSocket path2');
+
+  await server.close();
 ```

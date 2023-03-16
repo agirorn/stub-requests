@@ -1,0 +1,6 @@
+{
+  "extends": ["viking"],
+  "rules": {
+    "node/no-unpublished-import": "off"
+  }
+}
